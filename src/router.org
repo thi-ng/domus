@@ -56,6 +56,15 @@
 *** Implementation
 
 #+BEGIN_SRC clojure :noweb-ref router-public
+  (defn route-for-id
+    [routes id args]
+    (if-let [route (some #(if (= id (:id %)) %) routes)]
+      (->>  (:match route)
+            (reduce
+             (fn [acc x] (conj acc (if (keyword? x) (args x) x)))
+             [])
+            (str/join "/"))))
+
   (defn router
     [routes default-id route-changed]
     (let [routes (filter (complement :disabled) routes)]
@@ -65,21 +74,12 @@
             (route-changed info)
             (do
               (warn "no matching route:" (get-route) "redirect to default...")
-              (apply set-route! (:route (routes default-id)))))))))
+              (set-route! (route-for-id routes default-id {}))))))))
 
   (defn start!
     [router]
     (.addEventListener js/window "hashchange" router)
     (router))
-
-  (defn route-for-id
-    [routes id args]
-    (if-let [route (some #(if (= id (:id %)) %) routes)]
-      (->>  (:match route)
-            (reduce
-             (fn [acc x] (if (keyword? x) (args x) x))
-             ["/"])
-            (str/join "/"))))
 #+END_SRC
 
 ** Route matching & validation
