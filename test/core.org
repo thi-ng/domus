@@ -1,0 +1,31 @@
+#+SETUPFILE: "../src/setup.org"
+
+* thi.ng.domus.test.core
+
+** TODO Test constants
+
+#+BEGIN_SRC clojure :noweb-ref const
+  (def meaning 42)
+#+END_SRC
+
+** TODO Main tests
+
+#+BEGIN_SRC clojure :noweb-ref tests
+  (deftest epic-fail
+    (is (= 3 (+ 1 1)) "FIXME"))
+#+END_SRC
+
+** Namespace declaration
+
+#+BEGIN_SRC clojure :tangle ../babel/test/thi/ng/domus/test/core.cljs :noweb yes :mkdirp yes :padline no
+  (ns thi.ng.domus.test.core
+    (:require
+     [cemerick.cljs.test :as t]
+     [thi.ng.domus.core :as dom])
+    (:require-macros
+     [cemerick.cljs.test :refer (is deftest with-test testing)]))
+
+  <<const>>
+
+  <<tests>>
+#+END_SRC
