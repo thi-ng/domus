@@ -52,6 +52,10 @@ target/domus-<<version>>.js
 #+BEGIN_SRC clojure :noweb-ref dep-async
 [org.clojure/core.async "0.1.346.0-17112a-alpha"]
 #+END_SRC
+**** [[https://github.com/thi-ng/validate/][thi.ng/validate]]
+#+BEGIN_SRC clojure :noweb-ref dep-validate
+[thi.ng/validate "0.1.0-SNAPSHOT"]
+#+END_SRC
 *** Development
 **** [[https://github.com/cemerick/clojurescript.test][clojurescript.test]]
 #+BEGIN_SRC clojure :noweb-ref dep-cljs-test
@@ -133,7 +137,8 @@ REPL via =(require 'thi.ng.domus... :reload)= or similar.
               :url "http://www.apache.org/licenses/LICENSE-2.0"}
     :dependencies [<<dep-clj>>
                    <<dep-cljs>>
-                   <<dep-async>>]
+                   <<dep-async>>
+                   <<dep-validate>>]
 
     :profiles {:dev {:plugins [<<dep-cljsbuild>>
                                <<dep-cljs-test>>]

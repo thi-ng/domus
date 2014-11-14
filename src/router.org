@@ -1,0 +1,176 @@
+#+SETUPFILE: "setup.org"
+
+* Contents                                                         :toc_4_gh:
+ - [[#namespace-thingdomusrouter][Namespace: thi.ng.domus.router]]
+     - [[#public-api][Public API]]
+         - [[#usage-example][Usage example]]
+         - [[#implementation][Implementation]]
+     - [[#route-matching--validation][Route matching & validation]]
+     - [[#route--location-helpers][Route & location helpers]]
+     - [[#complete-namespace-definition][Complete namespace definition]]
+
+* Namespace: thi.ng.domus.router
+
+** Public API
+
+*** Usage example
+
+#+BEGIN_SRC clojure
+  (require
+   '[thi.ng.domus.router :as r]
+   '[thi.ng.domus.utils :as utils]
+   '[thi.ng.validate.core :as v])
+
+  (def routes
+    [{:id :home
+      :match ["home"]
+      :controller :home}
+     ;; match with validation
+     ;; first coerces user-id into integer before validation
+     {:id :user-profile
+      :match ["users" :id]
+      :controller :users
+      :validate {:id {:coerce utils/parse-int
+                      :validate [(v/pos)]}}}
+     ;; specify chained validators (here for :version)
+     {:id :media-version
+      :match ["media" :id :version]
+      :controller :media
+      :validate {:id {:validate [(v/uuid4)]}
+                 :version {:validate [(v/string) (v/member-of #{"S" "M" "L"})]}}}])
+
+  (defn route-changed
+    [route-info] (prn :route-changed route-info))
+
+  (-> routes
+      (r/router 0 route-changed)
+      (r/start!))
+
+  (r/route-for-id routes :user-profile {:id 123})
+  ;; => "/users/123"
+
+  (r/route-for-id routes :media-version {:id "918932A8-5399-432A-87C6-983F224941E5" :version "L"})
+  ;; => "/media/918932A8-5399-432A-87C6-983F224941E5/L"
+#+END_SRC
+
+*** Implementation
+
+#+BEGIN_SRC clojure :noweb-ref router-public
+  (defn router
+    [routes default-id route-changed]
+    (let [routes (filter (complement :disabled) routes)]
+      (fn []
+        (let [info (match-route routes)]
+          (if info
+            (route-changed info)
+            (do
+              (warn "no matching route:" (get-route) "redirect to default...")
+              (apply set-route! (:route (routes default-id)))))))))
+
+  (defn start!
+    [router]
+    (.addEventListener js/window "hashchange" router)
+    (router))
+
+  (defn route-for-id
+    [routes id args]
+    (if-let [route (some #(if (= id (:id %)) %) routes)]
+      (->>  (:match route)
+            (reduce
+             (fn [acc x] (if (keyword? x) (args x) x))
+             ["/"])
+            (str/join "/"))))
+#+END_SRC
+
+** Route matching & validation
+
+#+BEGIN_SRC clojure :noweb-ref router
+  (defn match-route*
+    [curr route]
+    (if (= (count curr) (count route))
+      (reduce
+       (fn [acc [a b]]
+         (cond
+          (= a b) acc
+          (keyword? b) (assoc acc b a)
+          :else (reduced nil)))
+       {} (partition 2 (interleave curr route)))))
+
+  (defn coerce-route-params
+    [specs params]
+    (reduce
+     (fn [params [k {:keys [coerce]}]]
+       (if coerce
+         (if-let [pv (try (coerce (params k)) (catch js/Error e))]
+           (assoc params k pv)
+           (reduced nil))
+         params))
+     params specs))
+
+  (defn validate-route-params
+    [specs params]
+    (if-let [params (coerce-route-params specs params)]
+      (let [valspecs (filter #(comp :validate val) specs)]
+        (if (seq valspecs)
+          (let [[params err] (->> valspecs
+                                  (reduce #(assoc % (key %2) (:validate (val %2))) {})
+                                  (v/validate params))]
+            (if-not err params))
+          params))))
+
+  (defn match-route
+    [routes]
+    (let [curr (get-route)]
+      (some
+       (fn [{:keys [match bindings controller]}]
+         (if-let [params (match-route* curr match)]
+           (if-let [params (if bindings (validate-route-params bindings params) params)]
+             {:controller controller
+              :params params
+              :route curr})))
+       routes)))
+#+END_SRC
+
+** Route & location helpers
+
+#+BEGIN_SRC clojure :noweb-ref helpers
+  (defn set-location!
+    [url] (set! (.-location js/window) url))
+
+  (defn get-route
+    [] (-> js/window (.-location) (.-hash) (.split "/") (.slice 1)))
+
+  (defn format-route
+    [base & params]
+    (apply str (interpose "/" (into ["#" (name base)] params))))
+
+  (defn set-route!
+    [id & params]
+    (set! (.-hash (.-location js/window)) (apply format-route id params)))
+
+  (defn replace-route!
+    [id & params]
+    (.replace (.-location js/window) (apply format-route id params)))
+
+  (defn local?
+    []
+    (let [host (.-hostname (.-location js/window))]
+      (re-find #"localhost|(192\.168\.)|(127\.0\.0\.1)" host)))
+#+END_SRC
+
+** Complete namespace definition
+
+#+BEGIN_SRC clojure :noweb yes :tangle ../babel/src/thi/ng/domus/router.cljs :mkdirp yes :padline no
+  (ns thi.ng.domus.router
+    (:require
+     [thi.ng.domus.log :refer [debug info warn]]
+     [thi.ng.domus.utils :as utils]
+     [thi.ng.validate.core :as v]
+     [clojure.string :as str]))
+
+  <<helpers>>
+
+  <<router>>
+
+  <<router-public>>
+#+END_SRC
