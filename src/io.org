@@ -1,0 +1,93 @@
+#+SETUPFILE: "setup.org"
+
+* Contents                                                         :toc_4_gh:
+ - [[#namespace-thingdomusio][Namespace: thi.ng.domus.io]]
+     - [[#xhr-request][XHR Request]]
+     - [[#helpers][Helpers]]
+     - [[#complete-namespace-definition][Complete namespace definition]]
+
+* Namespace: thi.ng.domus.io
+
+** XHR Request
+
+#+BEGIN_SRC clojure :noweb-ref xhr
+  (defn request
+    [{:keys [uri method params data success error headers edn? sign-key]
+      :or {edn? true}}]
+    (let [req     (goog.net.XhrIo.)
+          method  (str/upper-case (name method))
+          data    (->request-data data)
+          success (->callback success edn?)
+          error   (->callback error edn?)
+          headers (->headers headers :edn edn?)
+          uri     (str uri (format-query-params params))
+          data    (if sign-key (append-signature uri data sign-key) data)]
+      (debug :request uri :data data)
+      (when success
+        (ev/listen req goog.net.EventType/SUCCESS #(success req)))
+      (when error
+        (ev/listen req goog.net.EventType/ERROR #(error req))
+        (ev/listen req goog.net.EventType/TIMEOUT #(error req)))
+      (.send req uri method data (when headers (clj->js headers)))))
+#+END_SRC
+
+** Helpers
+
+#+BEGIN_SRC clojure :noweb-ref helpers
+  (defn format-query-params
+    [params]
+    (when params
+      (->> params
+           (mapv (fn [[k v]] (str (name k) "=" v "&")))
+           (apply str "?"))))
+
+  (defn ->request-data
+    [data]
+    (if (map? data)
+      (->> data
+           (clj->js)
+           (structs/Map.)
+           (qd/createFromMap)
+           (str))
+      data))
+
+  (defn ->callback
+    [callback edn?]
+    (when callback
+      (fn [req]
+        (callback
+         (.getStatus req)
+         (if edn?
+           (read-string (.getResponseText req))
+           (.getResponseText req))))))
+
+  (defn ->headers
+    [headers & {:keys [edn xsrf]}]
+    (cond-> headers
+            edn (assoc "Accept" "application/edn")))
+
+  (defn append-signature
+    [uri data key]
+    (let [sig (.hash js/Sha256 (str uri ";" data ";" key))]
+      (debug :signature sig)
+      (str data "&sig=" sig)))
+#+END_SRC
+
+** Complete namespace definition
+
+#+BEGIN_SRC clojure :tangle ../babel/src/thi/ng/domus/io.cljs :noweb yes :mkdirp yes :padline no
+  (ns thi.ng.domus.io
+    (:require
+     [thi.ng.domus.log :refer [debug info warn]]
+     [goog.net.XhrIo :as xhr]
+     [goog.events :as ev]
+     [goog.net.EventType]
+     [goog.Uri.QueryData :as qd]
+     [goog.structs :as structs]
+     [cljs.reader :refer [read-string]]
+     [clojure.string :as str]))
+
+  <<helpers>>
+
+  <<xhr>>
+#+END_SRC
