@@ -13,7 +13,7 @@
 #+BEGIN_SRC clojure :noweb-ref xhr
   (defn request
     [{:keys [uri method params data success error headers edn? sign-key]
-      :or {edn? true}}]
+      :or {edn? true method :get}}]
     (let [req     (goog.net.XhrIo.)
           method  (str/upper-case (name method))
           data    (->request-data data)
