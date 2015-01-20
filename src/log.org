@@ -1,4 +1,4 @@
-#+SETUPFILE: "setup.org"
+#+SETUPFILE: setup.org
 
 * Contents                                                         :toc_4_gh:
  - [[#namespace-thingdomuslog][Namespace: thi.ng.domus.log]]

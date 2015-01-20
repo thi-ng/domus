@@ -1,4 +1,4 @@
-#+SETUPFILE: "setup.org"
+#+SETUPFILE: setup.org
 #+TITLE: thi.ng/domus
 
 * About the project
@@ -165,7 +165,7 @@ REPL via =(require 'thi.ng.domus... :reload)= or similar.
 ** ClojureScript HTML harness                                      :noexport:
 
 #+BEGIN_SRC html :tangle ../babel/index.html :noweb yes :mkdirp yes :padline no
-  <!DOCTYPE html5>
+  <!DOCTYPE html>
   <html lang="en">
     <head>
       <title><<lein-coords>> test</title>
@@ -197,7 +197,13 @@ symbol =version= holding the version string defined above:
 
 * Modules
 
-- [[core.org]]
+- [[./async.org][thi.ng.domus.async]]
+- [[./core.org][thi.ng.domus.core]]
+- [[./detect.org][thi.ng.domus.detect]]
+- [[./io.org][thi.ng.domus.io]]
+- [[./log.org][thi.ng.domus.log]]
+- [[./router.org][thi.ng.domus.router]]
+- [[./utils.org][thi.ng.domus.utils]]
 
 * Tests
 
