@@ -23,7 +23,7 @@ This project is open source and licensed under the [[http://www.apache.org/licen
 ** Injected properties                                             :noexport:
 
 #+BEGIN_SRC clojure :exports none :noweb-ref version
-0.1.0-SNAPSHOT
+0.1.0
 #+END_SRC
 #+BEGIN_SRC clojure :exports none :noweb-ref project-url
 http://thi.ng/domus
@@ -46,7 +46,7 @@ target/domus-<<version>>.js
 #+END_SRC
 **** [[https://github.com/clojure/clojurescript][ClojureScript]]
 #+BEGIN_SRC clojure :noweb-ref dep-cljs
-[org.clojure/clojurescript "0.0-2322"]
+[org.clojure/clojurescript "0.0-2913"]
 #+END_SRC
 **** core.async
 #+BEGIN_SRC clojure :noweb-ref dep-async
@@ -54,16 +54,16 @@ target/domus-<<version>>.js
 #+END_SRC
 **** [[https://github.com/thi-ng/validate/][thi.ng/validate]]
 #+BEGIN_SRC clojure :noweb-ref dep-validate
-[thi.ng/validate "0.1.0-SNAPSHOT"]
+[thi.ng/validate "0.1.0"]
 #+END_SRC
 *** Development
 **** [[https://github.com/cemerick/clojurescript.test][clojurescript.test]]
 #+BEGIN_SRC clojure :noweb-ref dep-cljs-test
-[com.cemerick/clojurescript.test "0.3.1"]
+[com.cemerick/clojurescript.test "0.3.3"]
 #+END_SRC
 **** [[https://github.com/emezeske/lein-cljsbuild][Cljsbuild]]
 #+BEGIN_SRC clojure :noweb-ref dep-cljsbuild
-[lein-cljsbuild "1.0.3"]
+[lein-cljsbuild "1.0.4"]
 #+END_SRC
 
 ** Contributors
@@ -142,7 +142,7 @@ REPL via =(require 'thi.ng.domus... :reload)= or similar.
 
     :profiles {:dev {:plugins [<<dep-cljsbuild>>
                                <<dep-cljs-test>>]
-                     :aliases {"cleantest" ["do" ["cljsbuild" "clean"] ["cljsbuild" "test"]]}}}
+                     :aliases {"cleantest" ["do" "clean" ["cljsbuild" "test"]]}}}
 
     :cljsbuild {:builds [{:source-paths ["src" "test"]
                           :id "dev"

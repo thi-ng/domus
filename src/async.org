@@ -17,7 +17,7 @@
     (publisher [_])
     (publish [_ id body])
     (subscribe [_ id] [_ id sub])
-    (unsubscribe [_] [_ id sub]))
+    (unsubscribe [_ id] [_ id sub]))
 
   (defn pub-sub
     [topic-fn]

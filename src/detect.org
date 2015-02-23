@@ -36,6 +36,8 @@
   (def ie? (or (aget js/document "documentMode")
                (re-find #"MSIE" (.-userAgent js/navigator))))
 
+  (def websocket? (not (nil? (aget js/window "WebSocket"))))
+
   (defn min-window-size
     [w h]
     (and (>= (.-innerWidth js/window) w)
