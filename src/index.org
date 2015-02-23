@@ -74,9 +74,9 @@ target/domus-<<version>>.js
 
 ** Release history
 
-| *Version* | *Released* | *Description*      | *Lein coordinates*       | *Tagged Github URL*                        |
-|-----------+------------+--------------------+--------------------------+--------------------------------------------|
-|     0.1.0 | 2015-02-23 | 1st public release | =[thi.ng/domus "0.1.0"]= | https://github.com/thi-ng/domus/tree/0.1.0 |
+| *Version* | *Released* | *Description*      | *Lein coordinates*       | *Tagged Github URL* |
+|-----------+------------+--------------------+--------------------------+---------------------|
+|     0.1.0 | 2015-02-23 | 1st public release | =[thi.ng/domus "0.1.0"]= | [[https://github.com/thi-ng/domus/tree/0.1.0][0.1.0]]               |
 
 ** Leiningen coordinates
 
