@@ -105,9 +105,9 @@
 #+BEGIN_SRC clojure :tangle ../babel/src/thi/ng/domus/async.cljs :noweb yes :mkdirp yes :padline no
   (ns thi.ng.domus.async
     (:require-macros
-     [cljs.core.async.macros :refer [go go-loop]])
+     [cljs.core.async.macros :refer [go go-loop]]
+     [cljs-log.core :refer [debug info warn severe]])
     (:require
-     [thi.ng.domus.log :refer [debug info warn]]
      [thi.ng.domus.core :as dom]
      [goog.events :as events]
      [cljs.core.async :as async :refer [<! >! chan put! close! timeout sliding-buffer]]))

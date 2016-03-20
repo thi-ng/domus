@@ -10,46 +10,52 @@
      - [[#complete-namespace-definition][Complete namespace definition]]
 
 * Namespace: thi.ng.domus.router
-
 ** Public API
-
 *** Usage example
 
 #+BEGIN_SRC clojure
   (require
    '[thi.ng.domus.router :as r]
-   '[thi.ng.domus.utils :as utils]
+   '[thi.ng.strf.core :as f]
    '[thi.ng.validate.core :as v])
 
+  ;; the :component keys are not required for the router
+  ;; a route spec can contain any number of other user data
+  ;; only required keys are: :id, :match, :validate (optional)
   (def routes
-    [{:id :home
-      :match ["home"]
-      :controller :home}
+    [{:id         :home
+      :match      ["home"]
+      :component  :home}
      ;; match with validation
      ;; first coerces user-id into integer before validation
-     {:id :user-profile
-      :match ["users" :id]
-      :controller :users
-      :validate {:id {:coerce utils/parse-int
-                      :validate [(v/pos)]}}}
+     ;; presence of :auth key will invoke user provided :auth fn (see below)
+     {:id         :user-profile
+      :match      ["users" :id]
+      :auth       true
+      :component  :users
+      :validate   {:id {:coerce   f/parse-int
+                        :validate [(v/pos)]}}}
      ;; specify chained validators (here for :version)
-     {:id :media-version
-      :match ["media" :id :version]
-      :controller :media
-      :validate {:id {:validate [(v/uuid4)]}
-                 :version {:validate [(v/string) (v/member-of #{"S" "M" "L"})]}}}])
+     {:id         :media-version
+      :match      ["media" :id :version]
+      :auth       true
+      :component  :media
+      :validate   {:id      {:validate [(v/uuid4)]}
+                   :version {:validate [(v/string) (v/member-of #{"S" "M" "L"})]}}}])
 
-  (defn route-changed
-    [route-info] (prn :route-changed route-info))
+  (defonce history (r/html5-history true))
 
-  (-> routes
-      (r/router 0 route-changed)
-      (r/start!))
+  (r/start!
+   {:history history
+    :routes  routes
+    :default (r/route-for-id routes :home)
+    :handler #(prn :route-changed %)
+    :auth    (constantly true)})
 
-  (r/route-for-id routes :user-profile {:id 123})
+  (r/format-route-for-id routes :user-profile {:id 123})
   ;; => "/users/123"
 
-  (r/route-for-id routes :media-version {:id "918932A8-5399-432A-87C6-983F224941E5" :version "L"})
+  (r/format-route-for-id routes :media-version {:id "918932A8-5399-432A-87C6-983F224941E5" :version "L"})
   ;; => "/media/918932A8-5399-432A-87C6-983F224941E5/L"
 #+END_SRC
 
@@ -57,46 +63,89 @@
 
 #+BEGIN_SRC clojure :noweb-ref router-public
   (defn route-for-id
+    "Takes vector of routes and route id to find, returns route spec."
+    [routes id] (some #(if (= id (:id %)) %) routes))
+
+  (defn format-route
+    "Takes a route spec map and map of params, returns formatted URI path"
+    [route params]
+    (->>  (:match route)
+          (reduce
+           (fn [acc x] (conj acc (if (keyword? x) (params x) x)))
+           [])
+          (str/join "/")))
+
+  (defn format-route-for-id
+    "Composition of route-for-id and format-route."
     [routes id args]
     (if-let [route (some #(if (= id (:id %)) %) routes)]
-      (->>  (:match route)
-            (reduce
-             (fn [acc x] (conj acc (if (keyword? x) (args x) x)))
-             [])
-            (str/join "/"))))
+      (format-route route args)))
 
-  (defn router
-    [routes default-id route-changed]
-    (let [routes (filter (complement :disabled) routes)]
-      (fn []
-        (let [info (match-route routes)]
-          (if info
-            (route-changed info)
-            (do
-              (warn "no matching route:" (get-route) "redirect to default...")
-              (set-route! (route-for-id routes default-id {}))))))))
+  (defn html5-history
+    [frag?] (doto (Html5History.) (.setUseFragment frag?)))
 
   (defn start!
-    [router]
-    (.addEventListener js/window "hashchange" router)
-    (router))
+    "Takes a map of following keys, configures and attaches router to
+    given history object:
+
+    - :history  - goog.Html5History instance
+    - :routes   - vector of route specs
+    - :init     - init URI path
+    - :default  - default route spec
+    - :dispatch - user nav change handler fn
+    - :auth     - user auth fn
+
+    - init URI can be used to force a certain entry route (default nil)
+    - handler fn is called on nav change with matched route spec
+    - auth fn also called with single route spec during matching and
+      can be used to restrict access to routes (e.g. if user not logged
+      in etc.). Only called for routes with :auth key enabled and must
+      return truthy value for route to succeed"
+    [{:keys [history routes init default dispatch auth]}]
+    (info "starting router...")
+    (let [init-uri (volatile! init)]
+      (doto history
+        (events/listen
+         EventType/NAVIGATE
+         (fn [e]
+           (if-let [init @init-uri]
+             (do (vreset! init-uri nil)
+                 (.setToken history init))
+             (let [token  (.-token e)
+                   route  (split-token token)
+                   route' (match-route routes route auth)]
+               ;;(debug :route route :token token :id (:id route'))
+               (if route'
+                 (dispatch route')
+                 (.setToken history (format-route default {})))))))
+        (.setEnabled true))))
+
+  (defn trigger!
+    "Takes URI path and sets as history token."
+    [history uri]
+    (.setToken history uri))
+
+  (defn virtual-link
+    "Helper :on-click handler for internal SPA links. Calls
+    preventDefault on event and calls trigger with given URI path."
+    [history uri] (fn [e] (.preventDefault e) (trigger! history uri)))
 #+END_SRC
 
 ** Route matching & validation
 
 #+BEGIN_SRC clojure :noweb-ref router
-  (defn match-route*
+  (defn- match-route*
     [curr route]
     (if (= (count curr) (count route))
       (reduce
        (fn [acc [a b]]
          (cond
-          (= a b) acc
-          (keyword? b) (assoc acc b a)
-          :else (reduced nil)))
+           (= a b)      acc
+           (keyword? b) (assoc acc b a)
+           :else        (reduced nil)))
        {} (partition 2 (interleave curr route)))))
 
-  (defn coerce-route-params
+  (defn- coerce-route-params
     [specs params]
     (reduce
      (fn [params [k {:keys [coerce]}]]
@@ -107,7 +156,7 @@
          params))
      params specs))
 
-  (defn validate-route-params
+  (defn- validate-route-params
     [specs params]
     (if-let [params (coerce-route-params specs params)]
       (let [valspecs (filter #(comp :validate val) specs)]
@@ -118,17 +167,23 @@
             (if-not err params))
           params))))
 
-  (defn match-route
-    [routes]
-    (let [curr (get-route)]
-      (some
-       (fn [{:keys [match bindings controller]}]
+  (defn- match-route
+    [routes curr user-fn]
+    (some
+     (fn [{:keys [match auth validate] :as spec}]
+       ;;(debug :match match curr)
+       (if (or (not auth) (user-fn curr))
          (if-let [params (match-route* curr match)]
-           (if-let [params (if bindings (validate-route-params bindings params) params)]
-             {:controller controller
-              :params params
-              :route curr})))
-       routes)))
+           (if-let [params (if validate (validate-route-params validate params) params)]
+             (assoc spec :params params)))))
+     routes))
+
+  (defn- split-token
+    [token]
+    (let [items (str/split token "/")]
+      (if-let [i (some (fn [[i x]] (if (#{"http:" "https:"} x) i)) (map-indexed vector items))]
+        (concat (take i items) [(str/join "/" (drop i items))])
+        items)))
 #+END_SRC
 
 ** Route & location helpers
@@ -137,22 +192,18 @@
   (defn set-location!
     [url] (set! (.-location js/window) url))
 
-  (defn get-route
+  (defn get-hash-route
     [] (-> js/window (.-location) (.-hash) (.split "/") (.slice 1)))
 
-  (defn format-route
-    [base & params]
-    (apply str (interpose "/" (into ["#" (name base)] params))))
-
-  (defn set-route!
-    [id & params]
-    (set! (.-hash (.-location js/window)) (apply format-route id params)))
+  (defn set-hash-route!
+    [routes id params]
+    (set! (.-hash (.-location js/window)) (format-route-for-id routes id params)))
 
   (defn replace-route!
-    [id & params]
-    (.replace (.-location js/window) (apply format-route id params)))
+    [routes id params]
+    (.replace (.-location js/window) (format-route-for-id routes id params)))
 
-  (defn local?
+  (defn localhost?
     []
     (let [host (.-hostname (.-location js/window))]
       (re-find #"localhost|(192\.168\.)|(127\.0\.0\.1)" host)))
@@ -162,15 +213,20 @@
 
 #+BEGIN_SRC clojure :noweb yes :tangle ../babel/src/thi/ng/domus/router.cljs :mkdirp yes :padline no
   (ns thi.ng.domus.router
+    (:require-macros
+     [cljs-log.core :refer [debug info warn severe]])
     (:require
-     [thi.ng.domus.log :refer [debug info warn]]
      [thi.ng.domus.utils :as utils]
      [thi.ng.validate.core :as v]
-     [clojure.string :as str]))
-
-  <<helpers>>
+     [clojure.string :as str]
+     [goog.events :as events]
+     [goog.history.EventType :as EventType])
+    (:import
+     [goog.history Html5History]))
 
   <<router>>
 
   <<router-public>>
+
+  <<helpers>>
 #+END_SRC
